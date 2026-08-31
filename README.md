@@ -27,17 +27,45 @@ The project ingests raw Formula 1 motorsport data, processes it through a Medall
 The data lifecycle flows through distinct layers, steadily increasing in structure and quality.
 
 ```mermaid
-graph LR
-    A[(Landing Layer<br>Raw Files)] -->|Ingest| B[Bronze Layer<br>Delta Append]
-    B -->|Cleanse & Flatten| C[Silver Layer<br>Delta Merge]
-    C -->|Dimensional Modeling| D[Gold Layer<br>Delta Merge]
-    D --> E[Databricks SQL<br>Dashboards]
+flowchart LR
+    subgraph External["External Sources"]
+        A[/"📁 Raw Files (CSV, JSON)"/]
+    end
+
+    subgraph ADLS["Azure Data Lake Storage (ADLS)"]
+        B[("🛬 Landing Zone")]
+    end
+
+    subgraph Databricks["Databricks Lakehouse Platform"]
+        C[("🥉 Bronze Layer<br/>(Raw Delta)")]
+        D[("🥈 Silver Layer<br/>(Cleansed Delta)")]
+        E[("🥇 Gold Layer<br/>(Star Schema)")]
+    end
+
+    subgraph Consumption["Analytics & BI"]
+        F{{"📊 Databricks SQL<br/>Dashboards"}}
+    end
+
+    A -- "Uploaded to" --> B
+    B -- "PySpark Ingest" --> C
+    C -- "Cleanse & Flatten<br/>(MERGE)" --> D
+    D -- "Dimensional Modeling<br/>(MERGE)" --> E
+    E -- "Query" --> F
+
+    %% Styling
+    classDef source fill:#f9ca24,stroke:#f0932b,stroke-width:2px,color:#000
+    classDef storage fill:#3498db,stroke:#2980b9,stroke-width:2px,color:#fff
+    classDef bronze fill:#cd7f32,stroke:#8c5622,stroke-width:2px,color:#fff
+    classDef silver fill:#bdc3c7,stroke:#7f8c8d,stroke-width:2px,color:#000
+    classDef gold fill:#f1c40f,stroke:#f39c12,stroke-width:2px,color:#000
+    classDef bi fill:#9b59b6,stroke:#8e44ad,stroke-width:2px,color:#fff
     
-    style A fill:#2d3436,color:#fff,stroke:#fff
-    style B fill:#cd7f32,color:#fff,stroke:#fff
-    style C fill:#bdc3c7,color:#000,stroke:#fff
-    style D fill:#f1c40f,color:#000,stroke:#fff
-    style E fill:#0984e3,color:#fff,stroke:#fff
+    class A source
+    class B storage
+    class C bronze
+    class D silver
+    class E gold
+    class F bi
 ```
 
 ### 1. Landing Layer (The Drop Zone)
@@ -65,16 +93,40 @@ The analytics-ready layer. We transform the normalized Silver data into a **Star
 A major focus of this project was moving away from inefficient full-refresh loads to a smart, **incremental batch process**.
 
 ```mermaid
-graph TD
-    A([New Batch folder in ADLS]) --> B{Identify Next Batch}
-    B -->|Found| C[Insert 'in_progress' to batch_control]
-    C --> D[[Run Incremental Refresh Job]]
-    D --> E[Process Bronze, Silver, Gold]
-    E --> F[Update batch_control to 'completed']
-    B -->|None Found| H([Gracefully Stop Job])
+flowchart TD
+    %% Define styles
+    classDef trigger fill:#e84393,stroke:#fd79a8,stroke-width:2px,color:#fff
+    classDef decision fill:#fdcb6e,stroke:#e17055,stroke-width:2px,color:#000
+    classDef process fill:#0984e3,stroke:#74b9ff,stroke-width:2px,color:#fff
+    classDef database fill:#00b894,stroke:#55efc4,stroke-width:2px,color:#fff
+    classDef terminate fill:#d63031,stroke:#ff7675,stroke-width:2px,color:#fff
+
+    Start(("🚀 Trigger Job")):::trigger --> Step1
     
-    style C fill:#00b894,color:#fff,stroke:#fff
-    style F fill:#e17055,color:#fff,stroke:#fff
+    subgraph Orchestration["Master Orchestration Job"]
+        Step1["🔍 Scan ADLS Landing<br>for New Batches"]:::process
+        Decision{"Batch Found?"}:::decision
+        
+        Step1 --> Decision
+        
+        Decision -- "Yes" --> InsertLog[/"📝 Insert 'in_progress'<br>into batch_control"/]:::database
+        Decision -- "No" --> Stop(("🛑 Stop Job")):::terminate
+        
+        InsertLog --> RunChild[["⚙️ Execute Incremental<br>Refresh Pipeline"]]:::process
+        
+        RunChild --> UpdateLog[/"✅ Update batch_control<br>to 'completed'"/]:::database
+    end
+    
+    subgraph Processing["Child Pipeline (Data Transformations)"]
+        Bronze["🥉 Append to Bronze"]:::process
+        Silver["🥈 Upsert (MERGE) Silver"]:::process
+        Gold["🥇 Upsert (MERGE) Gold"]:::process
+        
+        Bronze --> Silver --> Gold
+    end
+
+    RunChild -. "Triggers" .-> Bronze
+    Gold -. "Returns Success" .-> UpdateLog
 ```
 
 We built a custom `batch_control` table inside Unity Catalog. A **Master Orchestration Job** reads the Landing folder, compares it against the `batch_control` table, and passes the unprocessed `p_batch_id` as a parameter to the downstream data tasks. 
