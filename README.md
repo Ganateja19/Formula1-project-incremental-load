@@ -88,6 +88,15 @@ The analytics-ready layer. We transform the normalized Silver data into a **Star
 
 ---
 
+## 🚀 Pipeline Workflows (Databricks Jobs)
+
+### Full Refresh Pipeline
+Initially, the pipeline runs a complete end-to-end data load, refreshing all layers from scratch. 
+
+![Full Refresh Pipeline](00-common/Full%20Referesh.png)
+
+---
+
 ## 🔄 Orchestration & Incremental Batch Processing
 
 A major focus of this project was moving away from inefficient full-refresh loads to a smart, **incremental batch process**.
@@ -130,6 +139,11 @@ flowchart TD
 ```
 
 We built a custom `batch_control` table inside Unity Catalog. A **Master Orchestration Job** reads the Landing folder, compares it against the `batch_control` table, and passes the unprocessed `p_batch_id` as a parameter to the downstream data tasks. 
+
+### Incremental Batch Orchestration Job
+Below is the Databricks Lakeflow Job that automates this workflow:
+
+![Batch Orchestration Job](00-common/Batch_Orchestration.png)
 
 ---
 
