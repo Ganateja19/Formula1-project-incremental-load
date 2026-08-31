@@ -1,5 +1,7 @@
 # 🏎️ Formula 1 Lakehouse: End-to-End Data Engineering on Databricks
 
+> **Note:** This repository is an advanced, production-grade evolution of the foundational [Formula 1 Data Engineering Project](https://github.com/Ganateja19/Formula1-Project). It introduces incremental batch processing, orchestration, and idempotency to handle real-world data pipelines at scale.
+
 Welcome to the **Formula 1 Lakehouse** project! This repository demonstrates a production-grade data engineering pipeline built entirely on **Databricks**, utilizing **PySpark**, **Delta Lake**, and **Unity Catalog**.
 
 The project ingests raw Formula 1 motorsport data, processes it through a Medallion Architecture, and serves it for high-performance BI reporting. Most importantly, it evolves from a simple full-refresh pipeline into a robust, **incremental batch-processing system** orchestrated by Databricks Lakeflow Jobs.
@@ -179,6 +181,3 @@ To spin up this project in your own Databricks environment:
    Update your specific Azure/AWS/GCP storage paths in the `00-common/01.environment-config.py` file.
 3. **Trigger the Pipeline:** 
    Use the master orchestration notebook in `06-orchestration/` to evaluate your Landing folders, initialize the control tables, and trigger the incremental Databricks Lakeflow job.
-
----
-*Built with ❤️ using PySpark, Delta Lake, and Databricks.*
